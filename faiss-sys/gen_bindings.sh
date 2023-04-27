@@ -5,15 +5,20 @@ if ! which bindgen > /dev/null; then
     exit 1
 fi
 
+<<<<<<< HEAD
 repo_url=https://github.com/facebookresearch/faiss.git
 repo_rev=1.7.2
+=======
+repo_url=https://github.com/facebookresearch/faiss
+repo_rev=v1.7.2
+>>>>>>> upstream/master
 cuda_root=/opt/cuda
 
-git clone $repo_url faiss --branch $repo_rev --depth 1
+git clone "$repo_url" faiss --branch "$repo_rev" --depth 1
 
 bindgen_opt='--size_t-is-usize --whitelist-function faiss_.* --whitelist-type idx_t|Faiss.* --opaque-type FILE'
 
-headers=`ls faiss/c_api/*_c.h faiss/c_api/impl/*_c.h`
+headers=`ls faiss/c_api/*_c.h faiss/c_api/impl/*_c.h faiss/c_api/utils/*_c.h`
 echo '// Auto-generated, do not edit!' > c_api.h
 for header in $headers; do
     echo "#include \""$header"\"" >> c_api.h;

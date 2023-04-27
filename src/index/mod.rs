@@ -25,6 +25,7 @@ pub mod autotune;
 pub mod flat;
 pub mod id_map;
 pub mod io;
+pub mod io_flags;
 pub mod ivf_flat;
 pub mod lsh;
 pub mod pretransform;
@@ -317,13 +318,25 @@ pub trait FromInnerPtr: NativeIndex {
 /// Trait for Faiss index types which can be built from a pointer
 /// to a native implementation.
 pub trait TryFromInnerPtr: NativeIndex {
-    fn try_from_inner_ptr(inner_ptr: *mut FaissIndex) -> Result<Self>
+    /// Create an index using the given pointer to a native object,
+    /// checking that the index behind the given pointer
+    /// is compatible with the target index type.
+    /// If the inner index is not compatible with the intended target type
+    /// (e.g. creating a `FlatIndex` out of a `FaissIndexLSH`),
+    /// an error is returned.
+    ///
+    /// # Safety
+    ///
+    /// This function is unable to check that
+    /// `inner_ptr` points to a valid, non-freed CPU index.
+    /// Moreover, `inner_ptr` must not be shared across multiple instances.
+    unsafe fn try_from_inner_ptr(inner_ptr: *mut FaissIndex) -> Result<Self>
     where
         Self: Sized;
 }
 
 /// A trait which provides a Clone implementation to native index types.
-pub trait TryClone: FromInnerPtr {
+pub trait TryClone {
     /// Create an independent clone of this index.
     ///
     /// # Errors
@@ -332,13 +345,17 @@ pub trait TryClone: FromInnerPtr {
     /// supported for the internal type of index.
     fn try_clone(&self) -> Result<Self>
     where
-        Self: Sized,
-    {
-        unsafe {
-            let mut new_index_ptr = ::std::ptr::null_mut();
-            faiss_try(faiss_clone_index(self.inner_ptr(), &mut new_index_ptr))?;
-            Ok(crate::index::FromInnerPtr::from_inner_ptr(new_index_ptr))
-        }
+        Self: Sized;
+}
+
+pub fn try_clone_from_inner_ptr<T>(val: &T) -> Result<T>
+where
+    T: FromInnerPtr,
+{
+    unsafe {
+        let mut new_index_ptr = ::std::ptr::null_mut();
+        faiss_try(faiss_clone_index(val.inner_ptr(), &mut new_index_ptr))?;
+        Ok(crate::index::FromInnerPtr::from_inner_ptr(new_index_ptr))
     }
 }
 
@@ -475,7 +492,7 @@ impl FromInnerPtr for IndexImpl {
 }
 
 impl TryFromInnerPtr for IndexImpl {
-    fn try_from_inner_ptr(inner_ptr: *mut FaissIndex) -> Result<Self>
+    unsafe fn try_from_inner_ptr(inner_ptr: *mut FaissIndex) -> Result<Self>
     where
         Self: Sized,
     {
@@ -519,7 +536,14 @@ impl<NI: NativeIndex> UpcastIndex for NI {
 
 impl_native_index!(IndexImpl);
 
-impl TryClone for IndexImpl {}
+impl TryClone for IndexImpl {
+    fn try_clone(&self) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        try_clone_from_inner_ptr(self)
+    }
+}
 
 /// Use the index factory to create a native instance of a Faiss index, for `d`-dimensional
 /// vectors. `description` should follow the exact guidelines as the native Faiss interface

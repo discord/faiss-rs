@@ -1,8 +1,8 @@
 //! Interface and implementation to Locality-Sensitive Hashing (LSH) index type.
 
 use super::{
-    AssignSearchResult, CpuIndex, FromInnerPtr, Idx, Index, IndexImpl, NativeIndex,
-    RangeSearchResult, SearchResult, TryClone, TryFromInnerPtr,
+    try_clone_from_inner_ptr, AssignSearchResult, CpuIndex, FromInnerPtr, Idx, Index, IndexImpl,
+    NativeIndex, RangeSearchResult, SearchResult, TryClone, TryFromInnerPtr,
 };
 use crate::error::{Error, Result};
 use crate::faiss_try;
@@ -42,10 +42,13 @@ impl FromInnerPtr for LshIndex {
 }
 
 impl TryFromInnerPtr for LshIndex {
-    fn try_from_inner_ptr(inner_ptr: *mut FaissIndex) -> Result<Self>
+    unsafe fn try_from_inner_ptr(inner_ptr: *mut FaissIndex) -> Result<Self>
     where
         Self: Sized,
     {
+        // safety: `inner_ptr` is documented to be a valid pointer to an index,
+        // so the dynamic cast should be safe.
+        #[allow(unused_unsafe)]
         unsafe {
             let new_inner = faiss_IndexLSH_cast(inner_ptr);
             if new_inner.is_null() {
@@ -103,14 +106,21 @@ impl LshIndex {
         unsafe { faiss_IndexLSH_rotate_data(self.inner) != 0 }
     }
 
-    pub fn bytes_per_vec(&self) -> usize {
-        unsafe { faiss_IndexLSH_bytes_per_vec(self.inner) as usize }
+    pub fn code_size(&self) -> usize {
+        unsafe { faiss_IndexLSH_code_size(self.inner) as usize }
     }
 }
 
 impl_native_index!(LshIndex);
 
-impl TryClone for LshIndex {}
+impl TryClone for LshIndex {
+    fn try_clone(&self) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        try_clone_from_inner_ptr(self)
+    }
+}
 
 impl IndexImpl {
     /// Attempt a dynamic cast of an index to the LSH index type.
