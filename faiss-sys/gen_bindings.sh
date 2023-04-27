@@ -5,13 +5,8 @@ if ! which bindgen > /dev/null; then
     exit 1
 fi
 
-<<<<<<< HEAD
-repo_url=https://github.com/facebookresearch/faiss.git
-repo_rev=1.7.2
-=======
 repo_url=https://github.com/facebookresearch/faiss
-repo_rev=v1.7.2
->>>>>>> upstream/master
+repo_rev=v1.7.4
 cuda_root=/opt/cuda
 
 git clone "$repo_url" faiss --branch "$repo_rev" --depth 1
